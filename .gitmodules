@@ -1,0 +1,15 @@
+[submodule "TrajectoryEditor"]
+	path = TrajectoryEditor
+	url = https://github.com/Dennis-Brandl/TrajectoryEditor.git
+[submodule "TrajectoryRuntime"]
+	path = TrajectoryRuntime
+	url = https://github.com/Dennis-Brandl/TrajectoryRuntime.git
+[submodule "TrajectoryActions"]
+	path = TrajectoryActions
+	url = https://github.com/Dennis-Brandl/TrajectoryActions.git
+[submodule "TrajectoryActionTester"]
+	path = TrajectoryActionTester
+	url = https://github.com/Dennis-Brandl/TrajectoryActionTester.git
+[submodule "TrajectoryManager"]
+	path = TrajectoryManager
+	url = https://github.com/Dennis-Brandl/TrajectoryManager.git
