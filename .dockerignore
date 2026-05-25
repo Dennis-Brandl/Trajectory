@@ -1,0 +1,36 @@
+# Build-context filter for the Action Container images (built with this
+# directory as context: see docker-compose.yml `actions-server`/`actions-console`).
+#
+# This directory holds the whole workspace, but the Actions build only needs
+# TrajectoryActions + TrajectoryEditor. Ignore everything, then re-include just
+# those two, then drop their heavy/irrelevant contents.
+#
+# (Editor, Runtime and Tester images build from their OWN subdirectory contexts
+# and use their own .dockerignore files — this file does not affect them.)
+
+# Ignore everything by default...
+*
+
+# ...re-include only the two repos the Action Container build needs.
+!TrajectoryActions
+!TrajectoryEditor
+
+# Drop heavy / irrelevant content inside the re-included repos.
+**/node_modules
+**/dist
+**/.git
+**/.claude
+**/.planning
+**/.superpowers
+**/coverage
+**/.vs
+**/*.log
+**/*.db
+**/*.db-wal
+**/*.db-shm
+TrajectoryEditor/electron-dist
+TrajectoryEditor/Trajectory-dist
+TrajectoryEditor/Trajectory-dist.zip
+TrajectoryEditor/.dev-backups
+TrajectoryEditor/test-data
+TrajectoryEditor/e2e

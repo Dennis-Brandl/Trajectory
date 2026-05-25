@@ -1,0 +1,77 @@
+##############################################################################
+# Trajectory Platform — Docker Compose (all apps)
+#
+# Run from this directory (the parent that holds the four app repos as
+# siblings). Brings up the whole platform:
+#
+#   docker compose up --build -d
+#   docker compose down
+#   docker compose down -v        # also delete the SQLite volumes
+#
+# Access:
+#   Editor (workflow authoring)     http://localhost:3000
+#   Runtime (execution web UI)      http://localhost:3001
+#   Action Container server (REST)  http://localhost:3002
+#   Action Container console (UI)   http://localhost:3003
+#   Action Tester                   http://localhost:3004
+#
+# The Action Container images build with THIS directory as context so the
+# console can reach the sibling TrajectoryEditor packages; .dockerignore keeps
+# that context small. Editor/Runtime/Tester build from their own subdirectories.
+##############################################################################
+
+services:
+  editor:
+    build:
+      context: ./TrajectoryEditor
+    ports:
+      - "3000:3000"
+    volumes:
+      - trajectoryeditor-data:/data
+    environment:
+      - NODE_ENV=production
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+    restart: unless-stopped
+
+  runtime:
+    build:
+      context: ./TrajectoryRuntime
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+
+  actions-server:
+    build:
+      context: .
+      dockerfile: TrajectoryActions/Dockerfile
+      target: server
+    ports:
+      - "3002:3002"
+    volumes:
+      - trajectoryactions-data:/data
+    restart: unless-stopped
+
+  actions-console:
+    build:
+      context: .
+      dockerfile: TrajectoryActions/Dockerfile
+      target: console
+    ports:
+      - "3003:80"
+    environment:
+      - ACTIONS_API_UPSTREAM=http://actions-server:3002
+    depends_on:
+      - actions-server
+    restart: unless-stopped
+
+  tester:
+    build:
+      context: ./TrajectoryActionTester
+    ports:
+      - "3004:80"
+    restart: unless-stopped
+
+volumes:
+  trajectoryeditor-data:
+  trajectoryactions-data:
