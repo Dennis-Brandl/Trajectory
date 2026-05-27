@@ -41,7 +41,7 @@ Confirm the submodules landed on the exact go-public commits (detached HEAD is e
 
 ```bash
 git -C TrajectoryEditor        rev-parse --short HEAD   # expect 2b824bf
-git -C TrajectoryRuntime       rev-parse --short HEAD   # expect 34aa719
+git -C TrajectoryRuntime       rev-parse --short HEAD   # expect 33e96bb
 git -C TrajectoryActions       rev-parse --short HEAD   # expect 5b5724e
 git -C TrajectoryActionTester  rev-parse --short HEAD   # expect c5d8815
 ```
@@ -49,7 +49,7 @@ git -C TrajectoryActionTester  rev-parse --short HEAD   # expect c5d8815
 | Submodule | Branch (pin source) | Expected HEAD |
 |---|---|---|
 | TrajectoryEditor | `feat/help-file` | `2b824bf` |
-| TrajectoryRuntime | `feat/rest-and-file-changes` | `34aa719` |
+| TrajectoryRuntime | `feat/rest-and-file-changes` | `33e96bb` |
 | TrajectoryActions | `feat/docker-setup` | `5b5724e` |
 | TrajectoryActionTester | `feat/docker-setup` | `c5d8815` |
 | (umbrella `Trajectory`) | `feat/docker-setup` | `c6df4be` |
