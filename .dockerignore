@@ -18,6 +18,12 @@
 # Drop heavy / irrelevant content inside the re-included repos.
 **/node_modules
 **/dist
+# TypeScript incremental-build state. MUST be excluded: with **/dist stripped
+# above, a stale tsbuildinfo copied from the host makes `tsc --build` think the
+# referenced projects are already built, so it skips re-emitting their .d.ts
+# (e.g. storage/dist/types.d.ts) — the console/server build then fails to
+# resolve @trajectory/engine. Keep build state out of the image entirely.
+**/*.tsbuildinfo
 **/.git
 **/.claude
 **/.planning
