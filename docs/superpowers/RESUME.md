@@ -1,5 +1,15 @@
 # Resume — TRY/CATCH/RETURN (paused 2026-05-31)
 
+> **UPDATE 2026-06-01 — ✅ WEB/TS RUNTIME PLAN EXECUTED & SHIPPED (Plan 1 complete):**
+> - All 18 tasks of `plans/2026-05-31-try-catch-runtime-web-ts.md` (Phases A–F) implemented subagent-driven on `TrajectoryRuntime` `main`, each task spec+code-quality reviewed, and pushed to `origin/main` (`c054102..eee35b0`).
+> - Tests: `engines/web` **148/148** (node:test); `engines/web-ui` **53/53** (tsc -b + tsx); conformance **64/67** — the 3 fails (`val-struct-002`, `exec-child-001`, `exec-child-003`) are **PRE-EXISTING since `c054102`** in form-binding + child-workflow areas untouched by this feature (`spec/conformance` has zero diff since baseline).
+> - Silent-swallow bug fixed end-to-end: a failed/aborted/timed-out ACTION PROXY now routes to its CATCH network (or ERRORs the workflow if uncaught), driven in production by `WorkflowCoordinator` feeding `submitAction({action:'fail', failure_mode, error})` (the empty-submit Phase-1 stub is gone).
+> - Grounded deviations (all sound per final whole-branch review = SHIP): `return-dispatcher.ts` folded into `engine.ts`; `CATCH_WITHOUT_RETURN`/`RETURN_WITHOUT_CATCH`/`CATCH_NETWORK_NOT_CONNECTED` are **editor-time** codes (runtime rejects RETURN-less/disconnected catch islands transitively as `ORPHANED_STEP`, per spec §6.5/§6.6); `release_on_catch` is parsed/validated but **inert** (descoped — no resource holder tracking).
+> - Also fixed at the start: 2 pre-existing `form-input-binding-validator` unit-test fixtures (missing schema-required `canvasWidth`/`canvasHeight`/element positions) — `f1ed506`.
+> - **REMAINING:** **Plan 2** = `plans/2026-05-31-try-catch-runtime-native-kmp.md` (Kotlin `kmp-engine` parity + the shared `spec/conformance` exec-try-catch fixtures as the cross-engine capstone — NOT STARTED; note `engines/kmp-engine` exists). Then the **editor plan** (still unvalidated vs the real TrajectoryEditor repo — ground it first) and the **docs plan**. Follow-up: resource holder-tracking + real `release_on_catch` (also closes the RETRY × held-exclusive-resource deadlock from spec §5.5).
+>
+> **— historical re-grounding note (2026-05-31) below —**
+
 > **UPDATE 2026-05-31 (later same day) — re-grounded, do not use the old runtime plan:**
 > - The spec + plans were **pushed to `origin/main`** (`ab70157..f57155a`).
 > - On resuming, the runtime plan (`plans/2026-05-31-try-catch-runtime.md`) was found **misgrounded** against the real code (assumed Vitest, a single engine with an `onActionInstanceTerminal` consumer, and an error-array validator — none exist). It is now **SUPERSEDED**.
