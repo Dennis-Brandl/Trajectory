@@ -1,5 +1,16 @@
 # Resume — TRY/CATCH/RETURN (paused 2026-05-31)
 
+> **UPDATE 2026-05-31 (later same day) — re-grounded, do not use the old runtime plan:**
+> - The spec + plans were **pushed to `origin/main`** (`ab70157..f57155a`).
+> - On resuming, the runtime plan (`plans/2026-05-31-try-catch-runtime.md`) was found **misgrounded** against the real code (assumed Vitest, a single engine with an `onActionInstanceTerminal` consumer, and an error-array validator — none exist). It is now **SUPERSEDED**.
+> - Deep recon established the real architecture (see **`plans/2026-05-31-try-catch-IMPLEMENTATION-NOTES.md`** and memory `project-trajectoryruntime-two-engines`): TWO engines (TS `engines/web/src` = web product + reference; Kotlin `kmp-engine` = native), parity via shared `spec/conformance`; action failures are silently swallowed today (no per-step fail signal); validators duplicated (TS + Kotlin); tests are `node:test` (TS) / `.\gradlew.bat :jvmTest` (Kotlin).
+> - **Decisions:** scope = **web + native (Kotlin) parity**; `release_on_catch` **descoped** to explicit Release commands; execution mode = **subagent-driven**.
+> - **New grounded plans replace the old runtime plan:**
+>   - ✅ `plans/2026-05-31-try-catch-runtime-web-ts.md` — authored & code-complete (Phases A–F), ready to execute.
+>   - ✅ `plans/2026-05-31-try-catch-runtime-native-kmp.md` — authored & code-complete (Phases K-A…K-F): Kotlin engine parity + the shared conformance fixtures (capstone). Execute AFTER the web/TS plan.
+> - **Both runtime plans authored 2026-05-31; neither executed yet.** Remaining beyond runtime: editor plan (unvalidated), docs plan, and android-app coordinator wiring (feed real failures into the Kotlin fail signal).
+> - The design spec (`specs/2026-05-31-try-catch-return-design.md`) remains canonical for behaviour; the editor & docs plans are still unvalidated against their repos.
+
 **Status when paused:** Spec + plans committed locally on `main`. Local is 2 commits ahead of `origin/main`. Implementation has NOT started.
 
 ## What's done

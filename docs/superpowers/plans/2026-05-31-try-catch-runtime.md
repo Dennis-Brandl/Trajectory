@@ -1,5 +1,7 @@
 # TRY / CATCH / RETURN — Runtime Implementation Plan
 
+> ⛔ **SUPERSEDED 2026-05-31** — found misgrounded against the real TrajectoryRuntime: it assumed Vitest, a single engine with an `onActionInstanceTerminal` consumer, and an error-array validator — **none of which exist** (the repo uses `node:test`, two parallel engines TS+Kotlin, and a fail-fast single-error `validate()`). **DO NOT EXECUTE.** Replaced by `2026-05-31-try-catch-runtime-web-ts.md` + `2026-05-31-try-catch-runtime-native-kmp.md`, grounded by `2026-05-31-try-catch-IMPLEMENTATION-NOTES.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement TRY/CATCH/RETURN error-handling primitives in the Trajectory Runtime — schema, validator, engine, and the full conformance fixture set — per the approved spec at `docs/superpowers/specs/2026-05-31-try-catch-return-design.md`.

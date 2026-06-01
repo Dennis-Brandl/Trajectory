@@ -1,0 +1,63 @@
+# TRY/CATCH/RETURN — Implementation Notes (grounded reality map + locked decisions)
+
+**Date:** 2026-05-31
+**Status:** Supersedes the recon assumptions in `2026-05-31-try-catch-runtime.md` (that plan was misgrounded — Vitest, a single engine with an `onActionInstanceTerminal` consumer, and an error-array validator, none of which exist). The **design spec** `specs/2026-05-31-try-catch-return-design.md` remains canonical for *what* to build; this file corrects *where/how*, grounded in real code (7 read-only recon passes, 2026-05-31).
+**Scope chosen by user:** Web (TypeScript) **and** native (Kotlin) parity. `release_on_catch` descoped to explicit Release commands (no auto-release).
+
+---
+
+## 1. Reality map (verified, with anchors)
+
+### 1.1 TypeScript engine — `engines/web/src` (the web product's real engine AND the reference engine)
+- Driven in production by `web-ui/src/coordinator/WorkflowCoordinator.ts` (`@engine` alias → `../web/src`): `new WorkflowEngine` (`:124`), `start()` (`:127`), `submitAction()` (`:301`,`:481`).
+- **Engine** `engine.ts`: `WorkflowEngine(workflow, setup?)`; `start()` `:121`; `submitAction(action, idx)` `:173` (**hard-codes `recordTrace(COMPLETED)`+`state='COMPLETED'` `:236-237`**); `getTrace()` `:258`; `getWorkflowState()` `:266`; `getProperties()` `:278`. Dispatch in `activateStepAfterResources` `:887` / `:901-950`. Single trace appender `recordTrace(stepOid, state, afterAction?, error?)` `:564`. Emitted states: `COMPLETED, EXECUTING, WAITING, PAUSED, IDLE, ERRORED`. **`WorkflowState` `ABORTED`/`STOPPED` are NEVER assigned; there is no whole-workflow abort method.** Only failure path = SCRIPT throws → `workflowState='ERRORED'` `:917-925` (the template to copy).
+- **step-handlers.ts**: `isAutoCompleting()` `:21-24` = `START,END,PARALLEL,WAIT ANY,SELECT 1,SCRIPT,MATH`; `needsUserAction()` = `USER_INTERACTION,YES_NO,ACTION PROXY`. Output-write pattern (CATCH must mirror): iterate `output_parameter_specifications`, `propertyStore.set(spec.target, value)` `:178`.
+- **types.ts**: `UserAction` `:432-437` = `{ step_oid; action:'submit'|'button_press'|'yes'|'no'|'pause'|'resume'; form_values?; button_output? }` — **no failure variant**. `TraceEntry` `:406-413` = `{ step_oid; state; order; timestamp; after_action?; error? }`. `step_type` typed as plain `string`.
+- **validator.ts**: `validate(workflow): ValidationResult` (also `validateWorkflow`), **fail-fast single-error**. Order: `preStructuralChecks → semanticValidation → actionProxyValidation → resourceValidation → formInputBindingValidation → structuralValidation(AJV)`. `INVALID_STEP_TYPE` from AJV enum failure `:536-538`. **`semanticValidation` (`:60-143`) runs an orphan-reachability BFS from START (`:113-130`) → a disconnected catch-network island trips `ORPHANED_STEP` unless exempted.** Reusable BFS to clone for the partition: `hasMatchingWaitAll` `:145-173`. No warnings channel (fine: `ORPHANED_CATCH` = runtime accepts → `valid:true`). Phases 0/A/A2 are top-level-steps only; A3/A4 recurse `children`.
+- **schema** `spec/workflow-schema.json`: `$defs.StepType.enum` lines 21-25 (12 values; add `"CATCH"`,`"RETURN"`). `MasterWorkflowStep` `:536-587` has **NO `additionalProperties:false`** (new fields already tolerated; add defs only for *shape* validation). No per-step-type conditionals → "X only on Y step" is semantic, in the validator.
+- **Resources** (`resource-manager.ts`): `InMemoryResourceManager`, **no holder tracking, no auto-release** → `release_on_catch` auto-release is impossible; descoped. **Properties** (`properties.ts`): flat `Map<string,string>` keyed `"Prop.Entry"`; `PropertyStore` has **no snapshot/restore** (`set` overwrites) → RESTART CLEAN reset is net-new.
+- **RESTART machinery**: `restartToSteps(targetOids)` `:1137`, `resetStep(oid)` `:1325` (resets step state, **not** properties/resources), `checkRestartSafety` `:1101`. PARALLEL branch-local teardown feasible via `findParallelOnPath`+`bfsForward`+`resetStep`.
+- **Build/test**: from `engines/web`: `npm run build` (tsc→dist) then `npm test` (`node --test dist/**/*.test.js`, node:test + node:assert/strict, tests co-located `src/*.test.ts`, import `./x.js`); conformance `npm run conformance` (`node dist/runner.js`, runs ALL fixtures, no per-fixture filter).
+
+### 1.2 Production wiring — `web-ui` (makes the web product *real*)
+- `WorkflowCoordinator.sync()` `:443-505` auto-launches `ActionProxyController` for active ACTION PROXY steps; on terminal `onTerminal`: `COMPLETED` → `submitAction({action:'submit', form_values: outputs})` `:481`; **`ERRORED` → `console.warn` + `submitAction({action:'submit', form_values:{}})` `:494` (silent success). `TODO(Phase 2): add a per-step fail signal` `:486-491`.**
+- actionProxy collapses every failure (`ABORTED/STOPPED/ERRORED`/404/transport) → `'ERRORED'` (`stateMapping.ts:14-17`, `ActionProxyController.ts:172-184`). **No timeout anywhere** (`timeout_ms` dead). No error/abort/timeout classification in the control path.
+- KMP path env-gated `VITE_USE_KMP_ENGINE` (default off → TS engine).
+
+### 1.3 Kotlin engine — `engines/kmp-engine` (native Android/iOS + parity)
+- **Engine** `WorkflowEngine.kt`: ctor `(workflow, setup?, resourceManager?)`; `start()` `:110`; `submitAction(action, idx)` `:163` (**hard-codes COMPLETED `:216`**); `getTrace/getWorkflowState/getProperties` `:229/231/233`. Dispatch `activateStepAfterResources` `:408-471`. `recordTrace` `:353`. `StepState` **already has `ABORTED`** (`Types.kt:259-262`); `WorkflowState.ABORTED` assigned only in `abortWorkflow()` `:984-997` (the ABANDON primitive). `TraceEntry.error` exists. Conformance compare does **not** check `error`.
+- **step-handlers** `StepHandlers.kt`: `isAutoCompleting()` `:14-17` (same list as TS); `canonicalStepType()` `:9` single normalizer (add CATCH/RETURN aliases here).
+- **types** `Types.kt`: `UserAction` `:342-348` = mirror of TS (no failure variant). 
+- **Action**: live path `onExternalStateChange` `:1085-1122` handles `ABORTED`/`ERRORED` but as terminal dead-ends (no routing, **no TIMEOUT**). **Conformance path never sets an invoker → ACTION PROXY can only ERROR-out; there is NO success seam and NO fail seam in test today** — both must be built (mirror TS `UserAction` extension).
+- **RESTART/abort**: `restartToSteps` `:1183`, `checkRestartSafety` `:1147`, `abortWorkflow()` `:984` (only ABORTED writer). `PropertyStore` has **no snapshot/restore**.
+- **validator** `Validator.kt`: `validate(Map): ValidationResult` `:433`, fail-fast, mirrors TS rule set. **`VALID_STEP_TYPES` `:177-182` must gain CATCH/RETURN** or INVALID_STEP_TYPE blocks both validation AND execution fixtures. Same orphan-style checks → catch-island exemption needed here too.
+- **JS facade** `JsApiFacade.kt`: `create/start/submitAction/getTrace/validate/...`; extending `@Serializable UserAction`/`TraceEntry` flows through free; no exported `abortWorkflow`/`restartToSteps` (add only if a JS-driven path needs it — conformance runs on JVM, so not required for parity tests).
+- **Build/test**: from `engines/kmp-engine`: `.\gradlew.bat :jvmTest` (bare `:jvmTest`; single-module root project `kmp-engine`; `ConformanceRunner.kt` `@TestFactory` runs all 4 fixture categories incl. validation; kotlin.test on JUnit5; JDK 17/21). Tests in `src/jvmTest` / `src/commonTest`.
+
+### 1.4 Shared conformance — `spec/conformance/`
+- Both runners auto-discover `C:\Trajectory\TrajectoryRuntime\spec\conformance` (subdirs `validation/execution/parameters/resources`). **One fixture proves both engines.** `runExecutionFixture` validates first (Kotlin throws on INVALID_STEP_TYPE), then builds engine, replays `user_actions`, compares trace(`step_oid/state/order/after_action`)+`workflow_state`+`final_properties`.
+- `test-fixture-schema.json`: `expected.workflow_state` enum **lacks `ERRORED`** (add it if a fixture asserts that final state; `ABORTED` already present). Trace `state` is free string (no change needed). Runners don't enforce the schema (advisory).
+
+---
+
+## 2. Locked design decisions (grounded)
+
+1. **The per-step fail signal is the linchpin, and it is a REAL engine API (not test-only).** Extend `UserAction` in both engines with a failure outcome — add `action: 'fail'` plus `failure_mode?: 'ERROR'|'ABORT'|'TIMEOUT'` and `error?: string`. Branch in `submitAction` BEFORE the hard-coded COMPLETED: record the step terminal, run TRY-matching, route to CATCH (or fall through to existing failure behavior when no matching TRY). Conformance fixtures drive it via `user_actions`; production drives it from the coordinator (replacing the silent-submit stub at `WorkflowCoordinator.ts:494`).
+2. **Classification + timeout live in the driver layer, not the conformance engine.** Mapping an Action-Container terminal (`ABORTED/STOPPED/ERRORED` + timeout marker) → `ERROR/ABORT/TIMEOUT` happens in the coordinator (TS `web-ui`; Kotlin `android-app`/invoker), which then calls `submitAction` with the resolved `failure_mode`. Fixtures supply `failure_mode` directly. The runtime **timeout timer** is a coordinator/actionProxy addition (start timer on invoke; on fire send AC `ABORT` + mark TIMEOUT). The engine only consumes a resolved mode — keeps it pure and conformance-testable.
+3. **CATCH and RETURN are auto-completing** (mirror START/END): add to `isAutoCompleting` + a branch in `activateStepAfterResources` (both engines). CATCH activation writes its `output_parameter_specifications` trigger info via `propertyStore.set(target)`. Engine holds `active_catches: Map<catch_oid, CatchContext>`.
+4. **RETURN command → existing primitives:** `ABANDON` → workflow abort (TS: new teardown setting `ABORTED`; Kotlin: reuse `abortWorkflow()`). `RESTART CLEAN/KEEP` → reuse `restartToSteps` to re-run from START; CLEAN additionally re-initialises the property store from `value_property_specifications` defaults (needs a small re-init/snapshot capability — new). `GOTO` → activate the target main-flow step; mark trigger inactive. `RETRY` → re-activate the trigger ACTION PROXY (in conformance, a 2nd `user_action` supplies the retry outcome). All: reset catch-network steps to IDLE + drop the `active_catches` entry.
+5. **Validator: catch-network orphan exemption is required.** Compute the partition (BFS-from-CATCH clone of `hasMatchingWaitAll`) and exempt catch-network steps from the existing `ORPHANED_STEP` reachability check, in BOTH validators. Then add structural/cross-ref/topology rules per spec §6. `ORPHANED_CATCH` is a runtime-accept (`valid:true`) — emit no error (editor owns the warning chip).
+6. **Resources descoped** (user decision): `release_on_catch` does NOT auto-release (no holder tracking exists). The flag is accepted-but-advisory in v1; catch networks include explicit Release commands. Fixtures 009/010 assert realistic held-vs-explicitly-released behavior.
+7. **Plan split (each yields working software):**
+   - **Plan 1 — Web (TS):** schema + TS validator rules (+orphan exemption) + CATCH/RETURN handlers + fail signal + TRY routing + RETURN dispatch + property re-init + `web-ui` coordinator wiring (real fail signal + timeout timer). TDD via **node:test unit tests** (mirrors existing `engine-*.test.ts`/`validator.test.ts`). Leaves TS green.
+   - **Plan 2 — Native (Kotlin) parity:** Kotlin validator rules + CATCH/RETURN handlers + fail signal + routing + RETURN dispatch + property re-init in `kmp-engine`; (android-app coordinator wiring as needed). **Capstone:** add the shared `spec/conformance` fixtures (exec-try-catch-001..010, valid V1..V7) + add `ERRORED` to `test-fixture-schema.json` — both engines now pass them, proving parity.
+   - Conformance fixtures are the **capstone of Plan 2** so neither engine's suite is ever red at a plan boundary.
+   - (Editor + docs remain separate plans — the editor plan is unvalidated against the real `TrajectoryEditor` repo and should get the same grounding check before execution.)
+
+---
+
+## 3. Open risks / verify during execution
+- Confirm `restartToSteps` preconditions (targets must be COMPLETED) don't conflict with RESTART-from-START; may need a dedicated "restart whole workflow" path rather than `restartToSteps([startOid])`.
+- PARALLEL branch-local RETRY/GOTO vs workflow-global ABANDON/RESTART: reuse `findParallelOnPath`/`bfsForward` (TS) and the Kotlin equivalents; verify branch-scoping holds with one flat step map.
+- Kotlin `compareTrace` ignores `error` text — design fixtures to assert on `state`+`workflow_state`, not error strings, for cross-engine parity.
+- `npm run conformance` runs ALL fixtures and the existing `exec-action-proxy-001.json` already stops at EXECUTING — ensure new fixtures don't perturb existing ones.
