@@ -15,6 +15,13 @@
 #   Action Container console (UI)   http://localhost:3003
 #   Action Tester                   http://localhost:3004
 #
+# All services bind to 127.0.0.1 (loopback) by default — safe for local
+# evaluation. To expose a service, change its mapping from "127.0.0.1:PORT:..."
+# to "0.0.0.0:PORT:..." AND: set the Editor's BASE_URL=https://... +
+# ALLOWED_ORIGINS and run behind a TLS-terminating proxy; set the Action
+# Container's ACTIONS_API_KEY to require auth. BETTER_AUTH_SECRET auto-generates
+# on first run if left unset.
+#
 # The Action Container images build with THIS directory as context so the
 # console can reach the sibling TrajectoryEditor packages; .dockerignore keeps
 # that context small. Editor/Runtime/Tester build from their own subdirectories.
@@ -25,7 +32,7 @@ services:
     build:
       context: ./TrajectoryEditor
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - trajectoryeditor-data:/data
     environment:
@@ -38,7 +45,7 @@ services:
     build:
       context: ./TrajectoryRuntime
     ports:
-      - "3001:80"
+      - "127.0.0.1:3001:80"
     restart: unless-stopped
 
   actions-server:
@@ -47,7 +54,7 @@ services:
       dockerfile: TrajectoryActions/Dockerfile
       target: server
     ports:
-      - "3002:3002"
+      - "127.0.0.1:3002:3002"
     volumes:
       - trajectoryactions-data:/data
     restart: unless-stopped
@@ -58,7 +65,7 @@ services:
       dockerfile: TrajectoryActions/Dockerfile
       target: console
     ports:
-      - "3003:80"
+      - "127.0.0.1:3003:80"
     environment:
       - ACTIONS_API_UPSTREAM=http://actions-server:3002
     depends_on:
@@ -69,7 +76,7 @@ services:
     build:
       context: ./TrajectoryActionTester
     ports:
-      - "3004:80"
+      - "127.0.0.1:3004:80"
     restart: unless-stopped
 
 volumes:
