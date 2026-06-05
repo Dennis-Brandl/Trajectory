@@ -68,6 +68,9 @@ services:
       - "127.0.0.1:3003:80"
     environment:
       - ACTIONS_API_UPSTREAM=http://actions-server:3002
+      # Must be DEFINED (may be empty) so nginx envsubst fills the X-API-Key
+      # header in the console proxy config; set it to require AC auth when exposed.
+      - ACTIONS_API_KEY=${ACTIONS_API_KEY:-}
     depends_on:
       - actions-server
     restart: unless-stopped
