@@ -1,4 +1,10 @@
-# Resume — TRY/CATCH/RETURN (paused 2026-05-31)
+# Resume — TRY/CATCH/RETURN
+
+> **UPDATE 2026-06-01 (latest) — ✅ PLAN 2 (Kotlin native-kmp parity + shared conformance capstone) COMPLETE & SHIPPED:**
+> Executed `plans/2026-05-31-try-catch-runtime-native-kmp.md` per-phase subagent-driven (implementer + spec-compliance review + code-quality review each phase) + a final whole-Plan-2 opus review (verdict: ready to merge). Pushed to `TrajectoryRuntime` origin/main `abed166..f6500e3` (14 commits: K-C…K-F + Final). Kotlin `.\gradlew.bat :jvmTest` = **112/0**; TS `npm run conformance` = **77 pass / 3 known-pre-existing fails** (val-struct-002, exec-child-001, exec-child-003); all **13 new shared fixtures (7 val + 6 exec) pass in BOTH engines** — the cross-engine parity proof. All 8 grounding corrections were applied. Both runtime engines now fully implement TRY/CATCH/RETURN.
+> **Remaining for the feature:** editor plan — EXECUTED & SHIPPED 2026-06-01 (`TrajectoryEditor` origin/main `27bd133..7b8a895`, 23 commits; grounded plan `plans/2026-06-01-try-catch-editor-grounded.md`; per-phase subagent-driven + whole-feature opus review = exact runtime parity; editor tests 1098 pass/0 fail). Follow-ups: CATCH trigger-info discoverability UX. Remaining: docs plan (`plans/2026-05-31-try-catch-docs.md`), and the **android-app (Kotlin) coordinator wiring** (feed real native failures into `submitAction(action:"fail")` — engine is ready; mirrors web-ui Plan 1 Phase F). Follow-ups: resource holder-tracking + real `release_on_catch` (spec §5.5); de-dup `restartToSteps`→`resetStepInline`; pre-existing `WAIT ACTION PROXY` in Kotlin VALID_STEP_TYPES not in shared schema/TS (dead/descoped); optional CATCH_REENTRY + nested-TRY fixtures.
+>
+> **— historical banners below (Plan 2 in-progress checkpoint / Plan 1) —**
 
 > **UPDATE 2026-06-01 (later) — 🚧 PLAN 2 (Kotlin native-kmp parity) IN PROGRESS — paused mid-execution:**
 > Executing `plans/2026-05-31-try-catch-runtime-native-kmp.md` subagent-driven (per-PHASE implementers + phase-boundary review + the shared conformance capstone as the cross-engine parity gate). Work in `engines/kmp-engine`. Pushed to `origin/main` through `abed166`. Tasks tracked #20–#26.

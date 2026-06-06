@@ -1,5 +1,7 @@
 # TRY / CATCH / RETURN — Editor Implementation Plan
 
+> ⚠️ **SUPERSEDED (2026-06-01).** This draft was misgrounded against the real TrajectoryEditor repo in 6 places (store, isValidConnection, validator model, renderer architecture, notation-config, exporter/importer signatures). Use the grounded revision: **`2026-06-01-try-catch-editor-grounded.md`**.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add the editor side of TRY/CATCH/RETURN — node types, palette, property panel editors, exporter, importer, validator mirror, change-propagation — per `docs/superpowers/specs/2026-05-31-try-catch-return-design.md`.
