@@ -19,7 +19,8 @@
 | Trigger info exposure | CATCH carries user-declared `output_parameter_specifications`. Author binds `trigger_step`, `trigger_step_oid`, `trigger_reason`, `error_message` to Value Properties of their choice. |
 | GOTO scope | Targets any main-flow step. Never a catch-network node. Validator enforces. |
 | Nested TRY | Allowed. An ACTION PROXY inside a catch network can have its own TRY → a different CATCH. |
-| Workflow-global vs branch-local | `ABANDON` and `RESTART` are workflow-global. `RETRY` and `GOTO` are branch-local (other parallel branches continue unaffected). |
+| Workflow-global vs branch-local | `ABANDON` and `RESTART` are workflow-global. `RETRY`, `GOTO`, and `COMPLETE` are branch-local (other parallel branches continue unaffected). |
+| COMPLETE semantics | Marks the triggering step `COMPLETED` and resumes its own successors as if it had succeeded. Strictly branch-local — never touches a parallel step. No sub-fields. Produces no action outputs (the action failed); the catch network sets Value Properties for any downstream data. |
 | Failure classification | Runtime-side, on AC's existing wire format. No Action Container protocol change. |
 | Schema version | Stays at `4.0`. Change is pure additive — old packages remain valid; old runtimes reject new packages with the existing `INVALID_STEP_TYPE` error. |
 | Catch re-entry while active | Default policy: workflow → `ABORTED` with `CATCH_REENTRY` error. Open to softer policy later. |
@@ -113,10 +114,10 @@ If the author omits `output_parameter_specifications`, the runtime still capture
 
 Field rules:
 
-- `return_config.command ∈ {"ABANDON", "RESTART", "GOTO", "RETRY"}`. Required.
+- `return_config.command ∈ {"ABANDON", "RESTART", "GOTO", "RETRY", "COMPLETE"}`. Required.
 - `restart_mode ∈ {"CLEAN", "KEEP"}`. Required iff `command == "RESTART"`. No default — the author must choose explicitly. Validator surfaces `MISSING_RESTART_MODE` if absent.
 - `goto_step_oid` (string). Required iff `command == "GOTO"`. Must resolve to a main-flow step's `oid` (validator: `GOTO_TARGET_NOT_FOUND`, `GOTO_TARGET_IN_CATCH`).
-- `ABANDON` and `RETRY` use no sub-fields.
+- `ABANDON`, `RETRY`, and `COMPLETE` use no sub-fields.
 
 ### 1.4 Worked example (round-trip)
 
@@ -320,7 +321,7 @@ When PARALLEL fans out two branches and one branch's ACTION PROXY fails:
 - Deactivate the failed step. Activate its CATCH. Capture `trigger_step_oid`.
 - The other parallel branches keep running unaffected.
 - When the catch's RETURN fires:
-  - `RETRY` and `GOTO` are **branch-local** — only the failed branch is touched; other branches continue.
+  - `RETRY`, `GOTO`, and `COMPLETE` are **branch-local** — only the failed branch is touched; other branches continue.
   - `RESTART` (`CLEAN` or `KEEP`) and `ABANDON` are **workflow-global** — all in-flight steps in all branches are torn down. See §5 for exact teardown order.
 
 ### 3.4 Engine touch points
@@ -462,13 +463,22 @@ If the new invocation fails the same way, the same TRY fires again. Loop-breakin
 
 **Interaction with `release_on_catch: false`.** If the failed TRY had `release_on_catch: false`, the trigger step's resources were still held while the catch network ran. On `RETRY`, the runtime does NOT re-execute the step's `resource_command_specifications` Acquire entries — the resources are already held and re-acquiring would deadlock on `binary exclusive use` or fail validation on `countable`. Instead, RETRY re-invokes the ACTION PROXY directly against the still-held resources. Release entries on the step's `resource_command_specifications` run normally at successful step completion. If the author's intent is "drop resources during recovery and re-acquire before retrying," they MUST set `release_on_catch: true` and rely on the step's Acquire commands to re-acquire on RETRY.
 
-### 5.6 Catch-network cleanup after any command
+### 5.6 COMPLETE (branch-local)
+
+1. Look up `CatchContext.trigger_step_oid` — the step that originally failed. It is currently `INACTIVE` (TRY deactivated it when the CATCH activated; see §5.4 step 2).
+2. Mark the trigger step `COMPLETED` and append the trace entry. Its `EXECUTING → INACTIVE` caught-failure history remains.
+3. Activate the trigger step's normal outgoing connection(s) — its success-path successors — as if it had completed. The trigger's completion-time **Release** `resource_command_specifications` run as part of normal completion; a `WAIT ALL` / `WAIT ANY` successor counts as one arrival at that join from this branch (identical to §5.4).
+4. Other parallel branches keep running, untouched. `COMPLETE` never advances, completes, aborts, or resets a sibling step. (A shared `WAIT ALL` join still blocks until the siblings arrive on their own.)
+
+No action outputs are produced (the action failed). `COMPLETE` carries no sub-fields. §5.7 cleanup (below) and §4.4 (the `CATCH_LATE_RETURN` no-op rule for non-`ABANDON` commands) apply unchanged.
+
+### 5.7 Catch-network cleanup after any command
 
 - Every step inside the catch network that's `ACTIVE` or `COMPLETED` for this catch run is reset to `INACTIVE`. Catch networks are re-entrant across separate firings; the same network may need to run again later.
 - `active_catches[catch_oid]` is removed.
 - Resources still held by catch-network steps at RETURN time are released.
 
-### 5.7 Summary
+### 5.8 Summary
 
 | Command | Workflow state after | Trigger step | Other branches | Resources | Properties |
 |---|---|---|---|---|---|
@@ -477,6 +487,7 @@ If the new invocation fails the same way, the same TRY fires again. Loop-breakin
 | `RESTART KEEP` | running (from START) | torn down | torn down | all released | preserved |
 | `GOTO X` | running (now at X) | inactive | unaffected | trigger's per `release_on_catch` | preserved |
 | `RETRY` | running (trigger re-invoking) | re-invoked with current inputs | unaffected | re-acquired per step config | preserved |
+| `COMPLETE` | running (past the trigger) | marked `COMPLETED`, successors activated | unaffected | trigger's Release commands run on completion | preserved |
 
 ---
 
@@ -493,7 +504,7 @@ All new checks follow the existing `SCREAMING_SNAKE_CASE` error code convention.
 | `TRY_ON_INVALID_STEP` | `try_specifications` non-empty on any step whose `step_type` ∉ `{ACTION PROXY, WAIT ACTION PROXY}`. |
 | `INVALID_TRY_MODE` | A `try_specifications[i].mode` ∉ `{ERROR, ABORT, TIMEOUT}`. |
 | `DUPLICATE_TRY_MODE` | The same `mode` appears more than once in one step's `try_specifications`. |
-| `INVALID_RETURN_COMMAND` | `return_config.command` ∉ `{ABANDON, RESTART, GOTO, RETRY}`. |
+| `INVALID_RETURN_COMMAND` | `return_config.command` ∉ `{ABANDON, RESTART, GOTO, RETRY, COMPLETE}`. |
 | `MISSING_RESTART_MODE` | `command == "RESTART"` and `restart_mode` is absent. |
 | `INVALID_RESTART_MODE` | `restart_mode` present and ∉ `{CLEAN, KEEP}`. |
 | `MISSING_GOTO_TARGET` | `command == "GOTO"` and `goto_step_oid` is absent. |
