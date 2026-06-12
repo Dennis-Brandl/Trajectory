@@ -600,7 +600,7 @@ Execution fixtures:
 | 5 | `exec-try-catch-005-restart-clean.json` | Same as 004 but `RESTART CLEAN`; property reset to default. |
 | 6 | `exec-try-catch-006-multi-mode-mapping.json` | One step has `TRY ON ERROR → C1`, `TRY ON TIMEOUT → C1`, `TRY ON ABORT → C2`; verify correct routing per induced failure. |
 | 7 | `exec-try-catch-007-parallel-branch-local.json` | `PARALLEL` fans out two ACTION PROXIES; one fails and `RETRY`s; other continues unaffected. |
-| 8 | `exec-try-catch-008-nested-try.json` | Catch-network ACTION PROXY itself fails with TRY → different CATCH. |
+| 8 | `exec-try-catch-008-error-to-complete.json` | ACTION PROXY fails with `ERROR`; CATCH activates; RETURN `COMPLETE`; trigger force-completed; main flow resumes → `COMPLETED`. |
 | 9 | `exec-try-catch-009-release-on-catch-true.json` | Failed step held a resource; CATCH activates with `release_on_catch: true`; resource available again in catch network. |
 | 10 | `exec-try-catch-010-release-on-catch-false.json` | Failed step held a resource; CATCH with `release_on_catch: false`; catch network sees resource still held. |
 
